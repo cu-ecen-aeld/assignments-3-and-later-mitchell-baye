@@ -17,7 +17,12 @@ bool do_system(const char *cmd)
  *   or false() if it returned a failure
 */
 
-    return true;
+    int ret = system(cmd);
+
+    if (ret != -1 && WEXITSTATUS(ret) == 0)
+        return true;
+    else
+        return false;
 }
 
 /**
@@ -47,7 +52,7 @@ bool do_exec(int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    //command[count] = command[count];
 
 /*
  * TODO:
@@ -58,6 +63,42 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+
+    pid_t childPid = fork();
+    
+    if (childPid < 0) {
+    	va_end(args);
+        perror("Fork Failed");
+        return false;
+    }
+    else if (childPid == 0)
+    {
+    	va_end(args);
+        execv(command[0], command);
+        perror("execv failed");
+        exit(EXIT_FAILURE);
+	}
+	else
+    {
+    	int status;
+    	if (waitpid(childPid, &status, 0) == -1)
+    	{
+    		va_end(args);
+    		perror("waitpid failed");
+    		return false;
+		}
+		va_end(args);
+		
+		if (WIFEXITED(status))
+		{
+			if (WEXITSTATUS(status) == 0)
+				return true;
+			else
+				return false;
+		}
+		else
+			return false; 
+	}
 
     va_end(args);
 
@@ -82,7 +123,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    // command[count] = command[count];
 
 
 /*
@@ -92,8 +133,54 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+	int childPid;
+    int fd = open(outputfile, O_WRONLY | O_TRUNC | O_CREAT, 0644);
+    
+    if (fd < 0) {
+        perror("Open Failed");
+        va_end(args);
+        close(fd);
+        return false;
+    }
 
-    va_end(args);
+    childPid = fork();
 
-    return true;
+    if (childPid < 0) {
+        perror("Fork Failed");
+        va_end(args);
+        return false;
+    }
+    else if (childPid == 0) {
+        if (dup2(fd, 1) < 0) {
+            perror("dup2 Failed");
+            close(fd);
+            va_end(args);
+            return false;
+        }
+
+        execv(command[0], command);
+		perror("execv failed");
+		close(fd);
+		va_end(args);
+		return false;
+	}
+    
+    int status;
+    
+    if (waitpid(childPid, &status, 0) == -1)
+    {
+    	va_end(args);
+    	perror("waitpid failed");
+    	return false;
+	}
+	va_end(args);
+	if (WIFEXITED(status))
+	{
+		if (WEXITSTATUS(status) == 0)
+			return true;
+		else
+			return false;
+	}
+	else
+		return false;
 }
