@@ -1,3 +1,6 @@
+.PHONY: all clean
+
+
 CROSS_COMPILE=
 
 IDIR =../include
@@ -12,17 +15,15 @@ _DEPS = writer.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 _OBJ = writer.o
-OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
+OBJ = $(_OBJ)
 
 $(ODIR)/%.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
+all: writer
+
 writer: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
-.PHONY: clean
-
-
-
 clean:
-	rm -f $(ODIR)/*.o *~ core writer
+	rm -f $(ODIR)/*.o *~ core $(IDIR)/*~ writer
