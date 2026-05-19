@@ -4,11 +4,11 @@ CROSS_COMPILE=
 
 IDIR =../include
 CC=$(CROSS_COMPILE)gcc
-CFLAGS=-I$(IDIR)
+CFLAGS=-I$(IDIR) -Wall -Wextra
+LIBS=-lpthread
 
 ODIR= .
 LDIR =../lib
-
 
 _DEPS = aesdsocket.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
