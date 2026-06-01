@@ -15,7 +15,7 @@ OBJ = $(_OBJ)
 all: aesdsocket
 
 aesdsocket: $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 clean:
 	rm -f *.o *~ core aesdsocket
