@@ -2,21 +2,14 @@
 
 CROSS_COMPILE=
 
-IDIR =../include
 CC=$(CROSS_COMPILE)gcc
-CFLAGS=-I$(IDIR) -Wall -Wextra
+CFLAGS=-Wall -Wextra
 LIBS=-lpthread
-
-ODIR= .
-LDIR =../lib
-
-_DEPS = aesdsocket.h
-DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 _OBJ = aesdsocket.o
 OBJ = $(_OBJ)
 
-$(ODIR)/%.o: %.c $(DEPS)
+%.o: %.c
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 all: aesdsocket
@@ -25,5 +18,5 @@ aesdsocket: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
 clean:
-	rm -f $(ODIR)/*.o *~ core $(IDIR)/*~ aesdsocket
+	rm -f *.o *~ core aesdsocket
 
