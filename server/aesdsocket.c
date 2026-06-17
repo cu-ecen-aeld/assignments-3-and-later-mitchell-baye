@@ -18,7 +18,11 @@
 /* Constants */
 #define PORT            9000
 #define BACKLOG         10
-#define DATA_FILE       "/var/tmp/aesdsocketdata"
+#if USE_AESD_CHAR_DEVICE
+    #define DATA_FILE       "/dev/aesdchar"
+#else    
+    #define DATA_FILE       "/var/tmp/aesdsocketdata"
+#endif
 #define RECV_BUF_SIZE   1024
 
 /* Thread list node */
@@ -44,6 +48,7 @@ static pthread_mutex_t thread_list_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_mutex_t file_lock = PTHREAD_MUTEX_INITIALIZER;
 
+#if !USE_AESD_CHAR_DEVICE
 static void *timer_thread(void *arg)
 {
     (void)arg;
@@ -78,6 +83,7 @@ static void *timer_thread(void *arg)
 
     return NULL;
 }
+#endif
 
 static void handle_signal(int signo)
 {
@@ -328,6 +334,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+#if !USE_AESD_CHAR_DEVICE
     pthread_t timer_tid;
     if (pthread_create(&timer_tid, NULL, timer_thread, NULL) != 0)
     {
@@ -335,6 +342,7 @@ int main(int argc, char *argv[])
         close(server_fd);
         return -1;
     }
+#endif
 
     while (!exit_requested)
     {
@@ -394,10 +402,13 @@ int main(int argc, char *argv[])
 
     shutdown_all_threads();
     
+#if !USE_AESD_CHAR_DEVICE
     timer_stop = 1;
     pthread_join(timer_tid, NULL);
 
     remove(DATA_FILE);
+
+#endif
 
     pthread_mutex_destroy(&thread_list_lock);
     pthread_mutex_destroy(&file_lock);
