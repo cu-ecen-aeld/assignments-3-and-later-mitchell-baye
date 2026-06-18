@@ -12,7 +12,7 @@
 #include "aesd-circular-buffer.h"
 #include <linux/slab.h>
 #include <linux/uaccess.h>
-#include <linux/string>
+#include <linux/string.h>
 
 #define AESD_DEBUG 1  //Remove comment on this line to enable debug
 
