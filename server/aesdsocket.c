@@ -257,6 +257,17 @@ static void *worker_thread(void *arg)
 
                 pthread_mutex_lock(&file_lock);
 
+#if USE_AESD_CHAR_DEVICE
+                ssize_t written = write(dev_fd, packet, packet_size);
+                if (written < 0)
+                    syslog(LOG_ERR, "write failed: %m");
+
+                char file_buf[RECV_BUFF_SIZE];
+                ssize_t readRet;
+                lseek(dev_fd, 0, SEEK_SET);
+                while((readRet = read(dev_fd, file_buf, sizeof(file_buf))) > 0)
+                    send(client_fd, file_buf, readRet, 0);
+#else
                 FILE *fp = fopen(DATA_FILE, "a");
                 if (fp)
                 {
@@ -279,9 +290,8 @@ static void *worker_thread(void *arg)
                     fclose(fp);
                 }
                 else
-                {
                     syslog(LOG_ERR, "fopen r failed %m");
-                }
+#endif
 
                 pthread_mutex_unlock(&file_lock);
             }
