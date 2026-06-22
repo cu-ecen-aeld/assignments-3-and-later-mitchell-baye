@@ -17,7 +17,7 @@
 #include <time.h>
 #include <sys/ioctl.h>
 #if USE_AESD_CHAR_DEVICE
-    #include "aesd_ioctl.h"
+    #include "../aesd-char-driver/aesd_ioctl.h"
 #endif
 
 /* Constants */
@@ -262,7 +262,7 @@ static void *worker_thread(void *arg)
                 if (written < 0)
                     syslog(LOG_ERR, "write failed: %m");
 
-                char file_buf[RECV_BUFF_SIZE];
+                char file_buf[RECV_BUF_SIZE];
                 ssize_t readRet;
                 lseek(dev_fd, 0, SEEK_SET);
                 while((readRet = read(dev_fd, file_buf, sizeof(file_buf))) > 0)
