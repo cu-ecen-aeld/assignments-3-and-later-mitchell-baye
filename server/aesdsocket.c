@@ -14,6 +14,11 @@
 #include <syslog.h>
 #include <pthread.h>
 #include <sys/queue.h>
+#include <time.h>
+#include <sys/ioctl.h>
+#if USE_AESD_CHAR_DEVICE
+    #include "aesd_ioctl.h"
+#endif
 
 /* Constants */
 #define PORT            9000
@@ -48,7 +53,9 @@ static pthread_mutex_t thread_list_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_mutex_t file_lock = PTHREAD_MUTEX_INITIALIZER;
 
-#if !USE_AESD_CHAR_DEVICE
+#if USE_AESD_CHAR_DEVICE
+static int dev_fd = -1;
+#elif !USE_AESD_CHAR_DEVICE
 static void *timer_thread(void *arg)
 {
     (void)arg;
@@ -212,36 +219,73 @@ static void *worker_thread(void *arg)
             memcpy(packet + packet_size, recv_buf + offset, chunk_len);
             packet_size += chunk_len;
 
-            pthread_mutex_lock(&file_lock);
-
-            FILE *fp = fopen(DATA_FILE, "a");
-            if (fp)
+            if (strncmp(packet, "AESDCHAR_IOCSEEKTO:", 19) == 0)
             {
-                fwrite(packet, 1, packet_size, fp);
-                fclose(fp);
-            }
-            else
-            {
-                syslog(LOG_ERR, "fopen a+ failed %m");
-            }
+#if USE_AESD_CHAR_DEVICE
+                uint32_t write_cmd, write_cmd_offset;
+                if (sscanf(packet, "AESDCHAR_IOCSEEKTO:%u,%u", &write_cmd, &write_cmd_offset) == 2)
+                {
+                    struct aesd_seekto seekto;
+                    seekto.write_cmd = write_cmd;
+                    seekto.write_cmd_offset = write_cmd_offset;
 
-            fp = fopen(DATA_FILE, "r");
-            if (fp)
-            {
-                char file_buf[RECV_BUF_SIZE];
-                size_t r;
-                while ((r = fread(file_buf, 1, sizeof(file_buf), fp)) > 0)
-                    send(client_fd, file_buf, r, 0);
-
-                fclose(fp);
-            }
-            else
-            {
-                syslog(LOG_ERR, "fopen r failed %m");
-            }
-
-            pthread_mutex_unlock(&file_lock);
+                    pthread_mutex_lock(&file_lock);
+                    if (ioctl(dev_fd, AESDCHAR_IOCSEEKTO, &seekto) == -1)
+                    {
+                        syslog(LOG_ERR, "ioctl AESDCHAR_IOCSEEKTO failed: %m");
+                    }
+                    else
+                    {
             
+                        char file_buf[RECV_BUF_SIZE];
+                        ssize_t r;
+                        while ((r = read(dev_fd, file_buf, sizeof(file_buf))) > 0)
+                            send(client_fd, file_buf, r, 0);
+                    }
+                    pthread_mutex_unlock(&file_lock);
+                }
+                else
+                {
+                    syslog(LOG_ERR, "Failed to parse AESDCHAR_IOCSEEKTO command");
+                }
+#else
+                syslog(LOG_WARNING, "AESDCHAR_IOCSEEKTO recieved but USE_AESD_CHAR_DEVICE not enabled");
+#endif
+            }
+            else
+            {
+
+                pthread_mutex_lock(&file_lock);
+
+                FILE *fp = fopen(DATA_FILE, "a");
+                if (fp)
+                {
+                    fwrite(packet, 1, packet_size, fp);
+                    fclose(fp);
+                }
+                else
+                {
+                    syslog(LOG_ERR, "fopen a+ failed %m");
+                }
+
+                fp = fopen(DATA_FILE, "r");
+                if (fp)
+                {
+                    char file_buf[RECV_BUF_SIZE];
+                    size_t r;
+                    while ((r = fread(file_buf, 1, sizeof(file_buf), fp)) > 0)
+                        send(client_fd, file_buf, r, 0);
+
+                    fclose(fp);
+                }
+                else
+                {
+                    syslog(LOG_ERR, "fopen r failed %m");
+                }
+
+                pthread_mutex_unlock(&file_lock);
+            }
+
             free(packet);
             packet = NULL;
             packet_size = 0;
@@ -333,8 +377,15 @@ int main(int argc, char *argv[])
         close(server_fd);
         return -1;
     }
-
-#if !USE_AESD_CHAR_DEVICE
+#if USE_AESD_CHAR_DEVICE
+    dev_fd = open(DATA_FILE, O_RDWR);
+    if (dev_fd == -1)
+    {
+        syslog(LOG_ERR, "Failed to open %s: %m", DATA_FILE);
+        close(server_fd);
+        return -1;
+    }
+#elif !USE_AESD_CHAR_DEVICE
     pthread_t timer_tid;
     if (pthread_create(&timer_tid, NULL, timer_thread, NULL) != 0)
     {
@@ -401,8 +452,10 @@ int main(int argc, char *argv[])
     }
 
     shutdown_all_threads();
-    
-#if !USE_AESD_CHAR_DEVICE
+#if USE_AESD_CHAR_DEVICE
+    if (dev_fd != -1)
+        close(dev_fd);
+#elif !USE_AESD_CHAR_DEVICE
     timer_stop = 1;
     pthread_join(timer_tid, NULL);
 
