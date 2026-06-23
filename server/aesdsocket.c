@@ -53,9 +53,7 @@ static pthread_mutex_t thread_list_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_mutex_t file_lock = PTHREAD_MUTEX_INITIALIZER;
 
-#if USE_AESD_CHAR_DEVICE
-static int dev_fd = -1;
-#elif !USE_AESD_CHAR_DEVICE
+#if !USE_AESD_CHAR_DEVICE
 static void *timer_thread(void *arg)
 {
     (void)arg;
@@ -103,13 +101,6 @@ static void handle_signal(int signo)
         close(server_fd);
         server_fd = -1;
     }
-#if USE_AESD_CHAR_DEVICE
-    if (dev_fd != -1)
-    {
-        close(dev_fd);
-        dev_fd = -1;
-    }
-#endif
 }
 
 
@@ -237,17 +228,20 @@ static void *worker_thread(void *arg)
                     seekto.write_cmd_offset = write_cmd_offset;
 
                     pthread_mutex_lock(&file_lock);
-                    if (ioctl(dev_fd, AESDCHAR_IOCSEEKTO, &seekto) == -1)
+                    int fd = open(DATA_FILE, O_RDWR);
+                    if (ioctl(fd, AESDCHAR_IOCSEEKTO, &seekto) == -1)
                     {
                         syslog(LOG_ERR, "ioctl AESDCHAR_IOCSEEKTO failed: %m");
+                        close(fd);
                     }
                     else
                     {
             
                         char file_buf[RECV_BUF_SIZE];
-                        ssize_t r;
-                        while ((r = read(dev_fd, file_buf, sizeof(file_buf))) > 0)
-                            send(client_fd, file_buf, r, 0);
+                        ssize_t readRt;
+                        while ((readRt = read(fd, file_buf, sizeof(file_buf))) > 0)
+                            send(client_fd, file_buf, readRt, 0);
+                        close(fd);
                     }
                     pthread_mutex_unlock(&file_lock);
                 }
@@ -265,15 +259,24 @@ static void *worker_thread(void *arg)
                 pthread_mutex_lock(&file_lock);
 
 #if USE_AESD_CHAR_DEVICE
-                ssize_t written = write(dev_fd, packet, packet_size);
-                if (written < 0)
-                    syslog(LOG_ERR, "write failed: %m");
+                int fd = open(DATA_FILE, O_RDWR);
+                if (fd == -1)
+                    syslog(LOG_ERR, "open failed: %m");
+                else
+                {
+                    ssize_t written = write(fd, packet, packet_size);
+                    if (written < 0)
+                        syslog(LOG_ERR, "write failed: %m");
 
-                char file_buf[RECV_BUF_SIZE];
-                ssize_t readRet;
-                lseek(dev_fd, 0, SEEK_SET);
-                while((readRet = read(dev_fd, file_buf, sizeof(file_buf))) > 0)
-                    send(client_fd, file_buf, readRet, 0);
+                    char file_buf[RECV_BUF_SIZE];
+                    ssize_t readRet;
+                    
+                    lseek(fd, 0, SEEK_SET);
+                    while((readRet = read(fd, file_buf, sizeof(file_buf))) > 0)
+                        send(client_fd, file_buf, readRet, 0);
+                    
+                    close(fd);
+                }
 #else
                 FILE *fp = fopen(DATA_FILE, "a");
                 if (fp)
@@ -290,9 +293,9 @@ static void *worker_thread(void *arg)
                 if (fp)
                 {
                     char file_buf[RECV_BUF_SIZE];
-                    size_t r;
-                    while ((r = fread(file_buf, 1, sizeof(file_buf), fp)) > 0)
-                        send(client_fd, file_buf, r, 0);
+                    size_t readRt;
+                    while ((readRt = fread(file_buf, 1, sizeof(file_buf), fp)) > 0)
+                        send(client_fd, file_buf, readRt, 0);
 
                     fclose(fp);
                 }
@@ -400,16 +403,7 @@ int main(int argc, char *argv[])
         close(server_fd);
         return -1;
     }
-#if USE_AESD_CHAR_DEVICE
-    dev_fd = open(DATA_FILE, O_RDWR);
-    if (dev_fd == -1)
-    {
-        syslog(LOG_ERR, "Failed to open %s: %m", DATA_FILE);
-        close(dev_fd);
-        close(server_fd);
-        return -1;
-    }
-#elif !USE_AESD_CHAR_DEVICE
+#if !USE_AESD_CHAR_DEVICE
     pthread_t timer_tid;
     if (pthread_create(&timer_tid, NULL, timer_thread, NULL) != 0)
     {
@@ -476,10 +470,7 @@ int main(int argc, char *argv[])
     }
 
     shutdown_all_threads();
-#if USE_AESD_CHAR_DEVICE
-    if (dev_fd != -1)
-        close(dev_fd);
-#elif !USE_AESD_CHAR_DEVICE
+#if !USE_AESD_CHAR_DEVICE
     timer_stop = 1;
     pthread_join(timer_tid, NULL);
 
