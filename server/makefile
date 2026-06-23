@@ -1,14 +1,8 @@
 .PHONY: all clean
 
 CROSS_COMPILE=
-
 CC=$(CROSS_COMPILE)gcc
-USE_AESD_CHAR_DEVICE = 1
-CFLAGS=-Wall -Wextra
-CFLAGS += -DUSE_AESD_CHAR_DEVICE
-
-$(info DEBUG: CFLAGS = $(CFLAGS))
-
+CFLAGS ?= -Wall -Wextra
 LIBS=-lpthread
 
 _OBJ = aesdsocket.o
