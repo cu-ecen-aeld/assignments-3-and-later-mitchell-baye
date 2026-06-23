@@ -6,6 +6,9 @@ CC=$(CROSS_COMPILE)gcc
 USE_AESD_CHAR_DEVICE = 1
 CFLAGS=-Wall -Wextra
 CFLAGS += -DUSE_AESD_CHAR_DEVICE
+
+$(info DEBUG: CFLAGS = $(CFLAGS))
+
 LIBS=-lpthread
 
 _OBJ = aesdsocket.o

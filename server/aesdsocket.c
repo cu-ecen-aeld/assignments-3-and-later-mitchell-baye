@@ -335,6 +335,12 @@ int main(int argc, char *argv[])
     int daemon_mode = 0;
     int opt;
 
+#if USE_AESD_CHAR_DEVICE
+    syslog(LOG_INFO, "COMPILED WITH USE_AESD_CHAR_DEVICE");
+#else
+    syslog(LOG_INFO, "COMPILED WITHOUT USE_AESD_CHAR_DEVICE - WILL USE TIMER");
+#endif
+
     while ((opt = getopt(argc, argv, "d")) != -1)
     {
         if (opt == 'd')
