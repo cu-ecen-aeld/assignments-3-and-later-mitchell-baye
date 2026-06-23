@@ -405,7 +405,7 @@ int main(int argc, char *argv[])
     if (dev_fd == -1)
     {
         syslog(LOG_ERR, "Failed to open %s: %m", DATA_FILE);
-        close(server_fd);
+        close(dev_fd);
         return -1;
     }
 #elif !USE_AESD_CHAR_DEVICE
