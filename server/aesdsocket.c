@@ -103,6 +103,13 @@ static void handle_signal(int signo)
         close(server_fd);
         server_fd = -1;
     }
+#if USE_AESD_CHAR_DEVICE
+    if (dev_fd != -1)
+    {
+        close(dev_fd);
+        dev_fd = -1;
+    }
+#endif
 }
 
 
