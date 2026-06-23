@@ -336,9 +336,9 @@ int main(int argc, char *argv[])
     int opt;
 
 #if USE_AESD_CHAR_DEVICE
-    syslog(LOG_INFO, "COMPILED WITH USE_AESD_CHAR_DEVICE");
+    syslog(LOG_INFO, "COMPILED WITH USE_AESD_CHAR_DEVICE - timer not used");
 #else
-    syslog(LOG_INFO, "COMPILED WITHOUT USE_AESD_CHAR_DEVICE - WILL USE TIMER");
+    syslog(LOG_INFO, "COMPILED WITHOUT USE_AESD_CHAR_DEVICE - timer used");
 #endif
 
     while ((opt = getopt(argc, argv, "d")) != -1)
